@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BCA Dept. - Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Add a style for the delete button hover */
+        .delete-btn {
+            opacity: 0.5;
+            transition: opacity 0.2s ease-in-out;
+        }
+        .delete-btn:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <!-- Login Form (Visible by default) -->
+    <div id="login-container" class="min-h-screen flex items-center justify-center px-4">
+        <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">BCA Admin Login</h2>
+            <form id="login-form">
+                <div class="mb-4">
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="login-email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#f36363] focus:border-[#f36363]">
+                </div>
+                <div class="mb-6">
+                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="login-password" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#f36363] focus:border-[#f36363]">
+                </div>
+                <button type="submit" class="w-full bg-[#f36363] text-white py-2 px-4 rounded-md font-semibold hover:brightness-90 transition duration-300">Login</button>
+                <p id="login-error" class="text-red-500 text-sm mt-4 text-center"></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Panel (Hidden by default) -->
+    <div id="admin-panel" class="hidden">
+        <!-- Header -->
+        <nav class="bg-white shadow-md">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <h1 class="text-xl font-bold text-[#f36363]">BCA Notification Panel</h1>
+                    <div class="flex items-center">
+                        <span id="user-email" class="text-sm text-gray-600 mr-4 hidden sm:block"></span>
+                        <button id="logout-button" class="text-sm font-medium text-red-600 hover:text-red-800 transition">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content Grid -->
+        <!-- On mobile (default) this is 1 column, on medium screens (md) and up, it's 2 columns -->
+        <div class="max-w-5xl mx-auto p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Column 1: Post New Notification -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Post a New Notification</h2>
+                <form id="notification-form">
+                    <div class="mb-4">
+                        <label for="title" class="block text-sm font-medium text-gray-700">Title</label>
+                        <input type="text" id="notification-title" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#f36363] focus:border-[#f36363]" placeholder="e.g., Exam Rescheduled">
+                    </div>
+                    <div class="mb-4">
+                        <label for="message" class="block text-sm font-medium text-gray-700">Message</label>
+                        <textarea id="notification-message" rows="4" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#f36363] focus:border-[#f36363]" placeholder="Full details about the notification..."></textarea>
+                    </div>
+                    <div class="mb-6">
+                        <label for="notification-duration" class="block text-sm font-medium text-gray-700">Show this notification for:</label>
+                        <select id="notification-duration" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#f36363] focus:border-[#f36363] bg-white">
+                            <option value="1_hour">1 Hour</option>
+                            <option value="6_hours">6 Hours</option>
+                            <option value="1_day" selected>1 Day</option>
+                            <option value="3_days">3 Days</option>
+                            <option value="1_week">1 Week</option>
+                            <option value="permanent">Permanent</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-[#f36363] text-white py-2 px-4 rounded-md font-semibold hover:brightness-90 transition duration-300">Push Notification</button>
+                    <p id="notification-success" class="text-green-600 text-sm mt-4 text-center"></p>
+                </form>
+            </div>
+
+            <!-- Column 2: Current Notifications List -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Current Notifications</h2>
+                <!-- Added responsive height: 400px on mobile, 600px on desktop -->
+                <div id="current-notifications-list" class="space-y-4 max-h-[400px] md:max-h-[600px] overflow-y-auto">
+                    <!-- Notifications will be loaded here by JavaScript -->
+                    <p id="loading-list" class="text-gray-500 text-center">Loading list...</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInWithEmailAndPassword, 
+            onAuthStateChanged, 
+            signOut 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            serverTimestamp,
+            Timestamp,
+            query,
+            orderBy,
+            onSnapshot,
+            doc,
+            deleteDoc
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 1. CONFIGURATION ---
+        
+        // PASTE YOUR FIREBASE CONFIG OBJECT HERE
+        const firebaseConfig = {
+            apiKey: "AIzaSyBTK9apeozZK627S2TAfS4iQIXvxOYH2Qk",
+            authDomain: "rrims-bca-website.firebaseapp.com",
+            projectId: "rrims-bca-website",
+            storageBucket: "rrims-bca-website.firebasestorage.app",
+            messagingSenderId: "1017948217711",
+            appId: "1:1017948217711:web:d338b0e75afc34ac45489a"
+        };
+        // End of Firebase Config
+        
+        const appId = firebaseConfig.appId;
+
+        // --- 2. INITIALIZATION ---
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        const notificationsColPath = `artifacts/${appId}/public/data/notifications`;
+        const notificationsCollection = collection(db, notificationsColPath);
+
+        // --- 3. UI ELEMENTS ---
+        const loginContainer = document.getElementById('login-container');
+        const adminPanel = document.getElementById('admin-panel');
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+        const userEmail = document.getElementById('user-email');
+        const logoutButton = document.getElementById('logout-button');
+        const notificationForm = document.getElementById('notification-form');
+        const notificationSuccess = document.getElementById('notification-success');
+        
+        // NEW UI Elements
+        const notificationListContainer = document.getElementById('current-notifications-list');
+        const loadingList = document.getElementById('loading-list');
+
+        // --- 4. AUTHENTICATION LOGIC ---
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            loginError.textContent = ''; 
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                console.error("Login Error:", error.message);
+                loginError.textContent = 'Invalid email or password. Please try again.';
+            }
+        });
+
+        logoutButton.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error("Logout Error:", error.message);
+            }
+        });
+
+        let unsubscribeFromNotifications = null; // To stop the listener on logout
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is signed in
+                loginContainer.classList.add('hidden');
+                adminPanel.classList.remove('hidden');
+                userEmail.textContent = `Logged in as: ${user.email}`;
+                
+                // NEW: Start listening for notifications
+                listenForNotifications();
+
+            } else {
+                // User is signed out
+                loginContainer.classList.remove('hidden');
+                adminPanel.classList.add('hidden');
+                userEmail.textContent = '';
+
+                // NEW: Stop the listener if it's active
+                if (unsubscribeFromNotifications) {
+                    unsubscribeFromNotifications();
+                }
+            }
+        });
+
+        // --- 5. FIRESTORE (WRITE) LOGIC ---
+        notificationForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('notification-title').value;
+            const message = document.getElementById('notification-message').value;
+            const duration = document.getElementById('notification-duration').value;
+            notificationSuccess.textContent = '';
+
+            if (!title || !message) {
+                notificationSuccess.textContent = 'Please fill out all fields.';
+                notificationSuccess.classList.remove('text-green-600');
+                notificationSuccess.classList.add('text-red-500');
+                return;
+            }
+
+            let expiresAt = new Date();
+            switch (duration) {
+                case '1_hour':
+                    expiresAt.setHours(expiresAt.getHours() + 1);
+                    break;
+                case '6_hours':
+                    expiresAt.setHours(expiresAt.getHours() + 6);
+                    break;
+                case '1_day':
+                    expiresAt.setDate(expiresAt.getDate() + 1);
+                    break;
+                case '3_days':
+                    expiresAt.setDate(expiresAt.getDate() + 3);
+                    break;
+                case '1_week':
+                    expiresAt.setDate(expiresAt.getDate() + 7);
+                    break;
+                case 'permanent':
+                    expiresAt = new Date('2100-01-01T00:00:00Z');
+                    break;
+                default:
+                    expiresAt.setDate(expiresAt.getDate() + 1);
+            }
+
+            try {
+                await addDoc(notificationsCollection, {
+                    title: title,
+                    message: message,
+                    createdAt: serverTimestamp(),
+                    expiresAt: expiresAt
+                });
+
+                notificationForm.reset();
+                notificationSuccess.textContent = 'Notification pushed successfully!';
+                notificationSuccess.classList.remove('text-red-500');
+                notificationSuccess.classList.add('text-green-600');
+                
+                setTimeout(() => {
+                    notificationSuccess.textContent = '';
+                }, 3000);
+
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                notificationSuccess.textContent = 'Error pushing notification. Check console.';
+                notificationSuccess.classList.remove('text-green-600');
+                notificationSuccess.classList.add('text-red-500');
+            }
+        });
+
+        // --- 6. NEW: FIRESTORE (READ & DELETE) LOGIC ---
+
+        function listenForNotifications() {
+            // Query to get all, sorted by creation date (newest first)
+            const q = query(notificationsCollection, orderBy("createdAt", "desc"));
+
+            unsubscribeFromNotifications = onSnapshot(q, (snapshot) => {
+                notificationListContainer.innerHTML = ''; // Clear the list
+                const now = new Date();
+
+                if (snapshot.empty) {
+                    notificationListContainer.innerHTML = '<p class="text-gray-500 text-center">No notifications found.</p>';
+                    return;
+                }
+
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    // Fallback for any old data that might not have 'expiresAt'
+                    const expiresAt = data.expiresAt ? data.expiresAt.toDate() : new Date(); 
+                    const isExpired = expiresAt < now;
+
+                    const card = document.createElement('div');
+                    card.className = `p-4 border rounded-lg ${isExpired ? 'bg-gray-100 opacity-60' : 'bg-white'}`;
+                    
+                    let html = `
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h4 class="font-semibold ${isExpired ? 'text-gray-600' : 'text-gray-900'}">${data.title}</h4>
+                                <p class="text-sm ${isExpired ? 'text-gray-500' : 'text-gray-600'}">${data.message}</p>
+                                <p class="text-xs text-gray-400 mt-2">
+                                    Expires: ${expiresAt.toLocaleString()}
+                                </p>
+                            </div>
+                    `;
+
+                    // Only show delete button for non-expired items (or all, for cleanup)
+                    // Let's show for all, but make it obvious
+                    html += `
+                        <button data-id="${doc.id}" class="delete-btn ml-2 p-1 text-red-600 flex-shrink-0" title="Delete this notification">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    `;
+
+                    html += `</div>`;
+                    card.innerHTML = html;
+                    notificationListContainer.appendChild(card);
+                });
+            }, (error) => {
+                console.error("Error listening to notifications:", error);
+                notificationListContainer.innerHTML = '<p class="text-red-500 text-center">Error loading list.</p>';
+            });
+        }
+
+        // Event Delegation for delete buttons
+        notificationListContainer.addEventListener('click', async (e) => {
+            // Find the closest delete button
+            const deleteButton = e.target.closest('.delete-btn');
+            
+            if (deleteButton) {
+                const docId = deleteButton.getAttribute('data-id');
+                if (!docId) return;
+
+                // Simple confirmation (can't use window.confirm)
+                // For now, we'll just delete directly.
+                // You could add a small modal here later if needed.
+                
+                try {
+                    const docRef = doc(db, notificationsColPath, docId);
+                    await deleteDoc(docRef);
+                    // The onSnapshot listener will automatically refresh the list
+                } catch (error) {
+                    console.error("Error deleting document:", error);
+                    alert("Error deleting notification. See console.");
+                }
+            }
+        });
+
+    </script>
+</body>
+</html>
+
